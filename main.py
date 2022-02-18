@@ -381,7 +381,7 @@ def read(): # read user input
         #print('{0} released'.format(key))
         if 'char' in dir(key):
             if key.char == 'c':
-                hold_current_piece()
+                pass
         else:
             if key == keyboard.Key.left:
                 for t in tetrominos:
