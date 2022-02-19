@@ -74,10 +74,12 @@ grid.append(['-' for i in range(width+2)])
 # all tetris pieces stored in here 
 tetrominos = []
 dead_locations = []
-debug = False
+held_piece = []
+previous_held = []
+rows_cleared = 0
 
 # ticks per second
-tps = 2
+tps = 4
 
 # only available colors in the metaverse that i bothered finding 
 class c:
@@ -124,9 +126,6 @@ class tetromino: # tetris blocks class
                 bottom_pixels += 1
                 if grid[y+1][x] == 0:
                     empty += 1
-        if debug: 
-            print(below_location_content)
-            print(self.moving)
         if empty == bottom_pixels:
             for i in range(len(self.locations)):
                 self.locations[i] = (self.locations[i][0]+1,self.locations[i][1])
@@ -163,7 +162,6 @@ class tetromino: # tetris blocks class
                     self.locations[i] = (self.locations[i][0],self.locations[i][1]+1)
 
     def rotate(self, rotation_direction:str): # rotate if cells of next rotation state are free cw/ccw
-        if debug: print(f'{c.red}rotate called{c.endc}')
         if self.moving:
             current_state = self.rotation_state
             if rotation_direction == 'cw':
@@ -174,7 +172,6 @@ class tetromino: # tetris blocks class
                 next_state = self.rotation_state - 1
                 if next_state == -1:
                     next_state = 3
-            if debug: print(f'{current_state=}\t{next_state=}')
             current_position = block_rotation_states[self.identity][current_state] # real 3x3 grid
             next_position = block_rotation_states[self.identity][next_state]
             # self.locations : [(x,y) * 4]
@@ -253,33 +250,29 @@ class tetromino: # tetris blocks class
 
 def render_dead(): # cant set global variable need to set dead_locations to new_dead_locations
     for l in dead_locations:
-        grid[l[0]][l[1]] = f'{c.black}#{c.endc}'
+        grid[l[0]][l[1]] = f'{c.red}#{c.endc}'
 
 def spawn(piece): # spawn a tetromino class, match its color, append to tetrominos
-    if piece == box: 
-        color = c.yellow
-        identity = 'o'
-    elif piece == line: 
-        color = c.cyan
-        identity = 'i'
-    elif piece == li: 
-        color = c.blue
-        identity = 'j'
-    elif piece == lr: 
-        color = c.white
-        identity = 'l'
-    elif piece == zi: 
-        color = c.green
-        identity = 's'
-    elif piece == zr: 
-        color = c.red
-        identity = 'z'
-    elif piece == tp: 
-        color = c.purple
-        identity = 't'
-    else: print(f'{c.red}invalid block{c.endc}')
-    t_p = tetromino(piece, color, identity)
+    t_p = tetromino(piece, get_color_from_shape(piece), get_identity_from_shape(piece))
     tetrominos.append(t_p)
+
+def get_identity_from_shape(shape):
+    if shape == box: return 'o'
+    elif shape == line: return 'i'
+    elif shape == li: return 'j'
+    elif shape == lr: return 'l'
+    elif shape == zi: return 's'
+    elif shape == zr: return 'z'
+    elif shape == tp: return 't'
+
+def get_color_from_shape(shape):
+    if shape == box: return c.yellow
+    elif shape == line: return c.cyan
+    elif shape == li: return c.blue
+    elif shape == lr: return c.white
+    elif shape == zi: return c.green
+    elif shape == zr: return c.red
+    elif shape == tp: return c.purple
 
 def population_control(): # all not moving pieces die
     global dead_locations
@@ -291,7 +284,7 @@ def population_control(): # all not moving pieces die
                 tetrominos.remove(t)
 
 def display_grid(): # displays game grid
-    clear()
+    #clear()
     print()
     for row in grid:
         for i, e in enumerate(row):
@@ -326,7 +319,6 @@ def clean_grid(): # clear spaces where there are no blocks
 
 def tick(): # tick all blocks down one 
     while True:
-        if debug: print(tetrominos)
         for t in tetrominos:
             t.step()
             t.refresh_board()
@@ -337,34 +329,80 @@ def tick(): # tick all blocks down one
         
 def clear_lines(): # when a line is full, delete line, move everything else down
     global dead_locations
-    # remove everything on the cleared out line
+    global rows_cleared
     n = len(grid)
-    for y in range(len(grid)):
-        ny = -y-1 # counting down backwards: -1, -2, -3...
-        ay =  n-y-1 # countindg backwards positively: 19, 18, 17...
-        if grid[ny].count(0) == 0: # a row is full / no zero's left
-            print(f'{ny} is full')
-            if ny != -1:
-                global dead_locations
-                new_dead_locations = []
-                for i, dl in enumerate(dead_locations):
-                    dly = dl[0]
-                    dlx = dl[1]
-                    if dl[0] < ay: # if dead piece is above the full row
-                        new_dead_locations.append((dly+1,dlx)) # move dead piece down one
-                    elif dly != ay:
-                        new_dead_locations.append((dly,dlx))
-                print_and_log(f'old {dead_locations}\nnew {new_dead_locations}')
-                dead_locations = new_dead_locations
+    
+    # finding each role that is full
+    full_rows = []
+    zero_count = []
+    for i in range(n-1):
+        row = grid[i] 
+        if row.count(0)==0 and i != n-1:
+            full_rows.append(i)
+        zero_count.append(row.count(0))
 
-def hold_current_piece(piece):
-    held_piece = piece
+    print_and_log(f'{full_rows=}\n{zero_count=}')
 
+    if len(full_rows) > 1:
+        # finding changes that should be done to each row
+        changes = [] 
+        for i in range(n-1):
+            if i in full_rows: 
+                changes.append(-1)
+            else:
+                larger_val = 0
+                for fr in full_rows:
+                    if i < fr: 
+                        larger_val += 1
+                changes.append(larger_val)
+
+        print_and_log(f'{changes=}')
+
+        # comitting changes onto a new_dead_locations
+        new_dead_locations = []
+        for dl in dead_locations:
+            dly = dl[0]
+            dlx = dl[1]
+            if changes[dly] != -1:
+                new_dead_locations.append((dly+changes[dly],dlx))
+
+        print_and_log(f'\n\n{new_dead_locations=}\n\n')
+
+        # comitting changes to dead_locations
+        dead_locations = new_dead_locations
+
+        # scoring
+        rows_cleared += len(full_rows)
+
+def hold_current_piece():
+    global held_piece
+    global previous_held
+    active_piece = tetrominos[0].shape
+    # make sure no repeated holding / changing
+    if held_piece == []:
+        held_piece = active_piece
+        tetrominos[0].locations = []
+        tetrominos[0].moving = False
+    elif active_piece != previous_held:
+        temp = held_piece
+        previous_held = held_piece
+        held_piece = active_piece
+        active_piece = temp
+        # spawn active_piece
+        tetrominos[0].shape = active_piece
+        # spawn locations = what they would be if you spawned a new active_piece
+        tetrominos[0].locations = tetromino(active_piece, f'{c.red}', get_identity_from_shape(active_piece)).locations
+        tetrominos[0].identity = get_identity_from_shape(active_piece)
+        tetrominos[0].color = get_color_from_shape(active_piece)
+    
 def auto_spawn(): # spawn new pieces when there are no live pieces
     def add_next_piece():
-        random.shuffle(pieces)
-        for e in pieces:
-            next_pieces.append(e)
+        if True: 
+            next_pieces.append(li)
+        else:
+            random.shuffle(pieces)
+            for e in pieces:
+                next_pieces.append(e)
 
     while True:
         if len(tetrominos) == 0:
@@ -381,7 +419,7 @@ def read(): # read user input
         #print('{0} released'.format(key))
         if 'char' in dir(key):
             if key.char == 'c':
-                pass
+                hold_current_piece()
         else:
             if key == keyboard.Key.left:
                 for t in tetrominos:
