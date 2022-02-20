@@ -285,7 +285,7 @@ def display_grid(): # displays game grid
     display += f'score: {score}\n'
     print(display)
 
-    with open('/Users/tarioyou/Desktop/Files/Code/dumb2/tetris/logs.txt','a') as f:
+'''    with open('/Users/tarioyou/Desktop/Files/Code/dumb2/tetris/logs.txt','a') as f:
         for row in grid:
             for e in row:
                 if e != 0 and e != '-' and e != '|': f.write("1 ")
@@ -293,7 +293,7 @@ def display_grid(): # displays game grid
             f.write("\n")
         f.write("\n")
 
-'''def print_and_log(string):
+def print_and_log(string):
     print(string)
     with open('/Users/tarioyou/Desktop/Files/Code/dumb2/tetris/logs.txt','a') as f:
         f.write(str(string))'''
