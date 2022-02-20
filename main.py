@@ -293,10 +293,10 @@ def display_grid(): # displays game grid
             f.write("\n")
         f.write("\n")
 
-def print_and_log(string):
+'''def print_and_log(string):
     print(string)
     with open('/Users/tarioyou/Desktop/Files/Code/dumb2/tetris/logs.txt','a') as f:
-        f.write(str(string))
+        f.write(str(string))'''
 
 def clean_grid(): # clear spaces where there are no blocks
     global dead_locations
