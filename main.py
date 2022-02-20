@@ -3,7 +3,7 @@ from itertools import chain
 from pynput import keyboard
 import threading
 import random
-import os
+import math
 
 # presets for rotation
 i = [[0,0,0,0],
@@ -33,7 +33,6 @@ shape_names = ['i','o','j','l','s','z','t']
 
 global spawn_count
 spawn_count = 0    
-clear = lambda: os.system('clear')
 
 # creating all the rotation states for all the blocks
 for i in range(len(shapes)):
@@ -76,7 +75,7 @@ tetrominos = []
 dead_locations = []
 held_piece = []
 previous_held = []
-rows_cleared = 0
+score = 0
 
 # ticks per second
 tps = 4
@@ -131,9 +130,6 @@ class tetromino: # tetris blocks class
                 self.locations[i] = (self.locations[i][0]+1,self.locations[i][1])
         else:
             self.moving = False
-        with open('/Users/tarioyou/Desktop/Files/Code/dumb2/tetris/logs.txt','a') as f:
-            f.write(str(below_location_content))
-            f.write('\n')
 
     def move_left(self): # if left is clear, move left
         if self.moving:
@@ -201,8 +197,6 @@ class tetromino: # tetris blocks class
                     y=l[0]
                     new_locations.append((y-ymin,x-xmin))
 
-            #print(f'{new_locations=}\n{current_position=}\n{next_position=}\n{self.locations=}')
-
             # now the things matches up and ymin and xmin are accurate
             required_empty = 0
             new_rotation_location_on_grid = []
@@ -218,8 +212,6 @@ class tetromino: # tetris blocks class
                     actual_empty += 1
                 elif location in self.locations:
                     actual_empty += 1
-
-            #print(f'{required_empty=}\n{actual_empty=}\n{new_rotation_location_on_grid=}')
 
             if actual_empty == required_empty:
                 for i in range(len(self.locations)):
@@ -284,13 +276,14 @@ def population_control(): # all not moving pieces die
                 tetrominos.remove(t)
 
 def display_grid(): # displays game grid
-    #clear()
-    print()
+    cls = lambda: print('\n' * 100) #sp.call('clear', shell=True) #os.system('clear')
+    display = ''
     for row in grid:
-        for i, e in enumerate(row):
-            print(e,end=' ')
-        print()
-    print()
+        for e in row:
+            display += str(e) + ' '
+        display += '\n'
+    display += f'score: {score}\n'
+    print(display)
 
     with open('/Users/tarioyou/Desktop/Files/Code/dumb2/tetris/logs.txt','a') as f:
         for row in grid:
@@ -329,7 +322,7 @@ def tick(): # tick all blocks down one
         
 def clear_lines(): # when a line is full, delete line, move everything else down
     global dead_locations
-    global rows_cleared
+    global score
     n = len(grid)
     
     # finding each role that is full
@@ -341,9 +334,7 @@ def clear_lines(): # when a line is full, delete line, move everything else down
             full_rows.append(i)
         zero_count.append(row.count(0))
 
-    print_and_log(f'{full_rows=}\n{zero_count=}')
-
-    if len(full_rows) > 1:
+    if len(full_rows) >= 1:
         # finding changes that should be done to each row
         changes = [] 
         for i in range(n-1):
@@ -356,8 +347,6 @@ def clear_lines(): # when a line is full, delete line, move everything else down
                         larger_val += 1
                 changes.append(larger_val)
 
-        print_and_log(f'{changes=}')
-
         # comitting changes onto a new_dead_locations
         new_dead_locations = []
         for dl in dead_locations:
@@ -366,13 +355,11 @@ def clear_lines(): # when a line is full, delete line, move everything else down
             if changes[dly] != -1:
                 new_dead_locations.append((dly+changes[dly],dlx))
 
-        print_and_log(f'\n\n{new_dead_locations=}\n\n')
-
         # comitting changes to dead_locations
         dead_locations = new_dead_locations
 
         # scoring
-        rows_cleared += len(full_rows)
+        score += math.ceil(math.pow(len(full_rows),0.8))
 
 def hold_current_piece():
     global held_piece
@@ -398,8 +385,6 @@ def hold_current_piece():
 def auto_spawn(): # spawn new pieces when there are no live pieces
     def add_next_piece():
         if True: 
-            next_pieces.append(li)
-        else:
             random.shuffle(pieces)
             for e in pieces:
                 next_pieces.append(e)
@@ -413,10 +398,6 @@ def auto_spawn(): # spawn new pieces when there are no live pieces
 
 def read(): # read user input
     def on_press(key):
-        #print('{0} pressed'.format(key))   
-        return
-    def on_release(key):
-        #print('{0} released'.format(key))
         if 'char' in dir(key):
             if key.char == 'c':
                 hold_current_piece()
@@ -430,13 +411,18 @@ def read(): # read user input
             if key == keyboard.Key.space:
                 for t in tetrominos:
                     if t.moving: t.hard_drop()
+                    time.sleep(0.01)
             if key == keyboard.Key.up:
                 for t in tetrominos:
                     if t.moving: t.rotate('cw')
             if key == keyboard.Key.esc:
                 quit()
         clean_grid()
-        display_grid()
+        display_grid() 
+        #return
+    def on_release(key):
+        return
+        
     # Collect events until released
     with keyboard.Listener(on_press =on_press, 
         on_release=on_release) as listener:
